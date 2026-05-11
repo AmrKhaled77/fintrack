@@ -13,11 +13,47 @@ const state = {
     transactions: [],
     editingId: null,
     isProfileModalOpen: false,
+    exchangeRates: null,
+    exchangeDate: '',
+    exchangePromise: null,
+    conversionCurrencyById: {},
 };
 let chart = null;
+const exchangeApiUrl =
+    'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/egp.json';
+const exchangeFallbackApi = 'https://latest.currency-api.pages.dev/v1/currencies/egp.json';
+const supportedCurrencies = [
+    { code: 'USD', symbol: '$', key: 'usd' },
+    { code: 'EUR', symbol: '€', key: 'eur' },
+    { code: 'GBP', symbol: '£', key: 'gbp' },
+    { code: 'SAR', symbol: 'ر.س', key: 'sar' },
+    { code: 'AED', symbol: 'د.إ', key: 'aed' },
+];
 
 function formatEGP(value) {
     return `${Number(value).toFixed(2)} EGP`;
+}
+
+function formatRateDate(rawDate) {
+    return new Date(rawDate).toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+    });
+}
+
+function getRateByCode(code) {
+    if (!state.exchangeRates) return null;
+
+    const key = code.toLowerCase();
+    return state.exchangeRates[key] ?? null;
+}
+
+function convertFromEGP(amount, code) {
+    const rate = getRateByCode(code);
+    if (!rate) return '--';
+
+    return `${(Number(amount) * Number(rate)).toFixed(2)} ${code}`;
 }
 
 function renderIncomeExpenseChart() {
@@ -170,6 +206,80 @@ async function requestJson(url, options = {}) {
     return data;
 }
 
+function fetchExchangeData(url) {
+    return fetch(url).then((res) => {
+        if (!res.ok) throw new Error('Network response was not ok');
+        return res.json();
+    });
+}
+
+function renderExchangeRatesIntoPage() {
+    const container = document.getElementById('currency-container');
+    const updated = document.getElementById('last-updated');
+    if (!container || !updated) return;
+
+    if (!state.exchangeRates) {
+        container.innerHTML = `
+            <div class="col-span-all muted">
+                Loading exchange rates...
+            </div>
+        `;
+        updated.innerText = '';
+        return;
+    }
+
+    const cards = supportedCurrencies
+        .map((currency) => {
+            const rate = state.exchangeRates[currency.key];
+            const inverseRate = rate ? (1 / Number(rate)).toFixed(2) : '--';
+
+            return `
+                <div class="rate-card">
+                    <div class="rate-card-head">
+                        <span>${currency.code} / EGP</span>
+                        <span class="rate-symbol">${currency.symbol}</span>
+                    </div>
+                    <div class="rate-value">${inverseRate} <span class="rate-unit">EGP</span></div>
+                </div>
+            `;
+        })
+        .join('');
+
+    container.innerHTML = cards;
+    updated.innerText = state.exchangeDate ? `Last updated: ${state.exchangeDate}` : '';
+}
+
+function initExchangeRates() {
+    if (state.exchangePromise) {
+        return state.exchangePromise;
+    }
+
+    state.exchangePromise = fetchExchangeData(exchangeApiUrl)
+        .catch(() => fetchExchangeData(exchangeFallbackApi))
+        .then((data) => {
+            state.exchangeRates = data.egp || null;
+            state.exchangeDate = data.date ? formatRateDate(data.date) : '';
+            renderExchangeRatesIntoPage();
+            state.exchangePromise = null;
+        })
+        .catch((error) => {
+            console.error('Error fetching currency data:', error);
+            const container = document.getElementById('currency-container');
+            const updated = document.getElementById('last-updated');
+            if (container) {
+                container.innerHTML = `
+                    <div class="col-span-all error">
+                        Unable to load exchange rates at this time.
+                    </div>
+                `;
+            }
+            if (updated) updated.innerText = '';
+            state.exchangePromise = null;
+        });
+
+    return state.exchangePromise;
+}
+
 async function navigate(path) {
     if (window.location.pathname !== path) {
         window.history.pushState({}, '', path);
@@ -177,6 +287,11 @@ async function navigate(path) {
 
     if (path === '/dashboard') {
         await loadTransactions();
+        await initExchangeRates();
+    }
+
+    if (path === '/exchange-rates') {
+        await initExchangeRates();
     }
 
     render();
@@ -256,6 +371,7 @@ function dashboardPage() {
                                 <th>Type</th>
                                 <th>Category</th>
                                 <th>Date</th>
+                                <th>Converted</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -271,6 +387,25 @@ function dashboardPage() {
                                         <td class="${item.type === 'income' ? 'income' : 'expense'}">${item.type}</td>
                                         <td>${item.category || '-'}</td>
                                         <td>${item.date}</td>
+                                        <td>
+                                            <div class="convert-box">
+                                                <select class="convert-select" data-convert-id="${item.id}">
+                                                    ${supportedCurrencies
+                                                        .map((currency) => {
+                                                            const selected =
+                                                                (state.conversionCurrencyById[item.id] || 'USD') === currency.code
+                                                                    ? 'selected'
+                                                                    : '';
+                                                            return `<option value="${currency.code}" ${selected}>${currency.code}</option>`;
+                                                        })
+                                                        .join('')}
+                                                </select>
+                                                <span class="converted-value">${convertFromEGP(
+                                                    item.amount,
+                                                    state.conversionCurrencyById[item.id] || 'USD'
+                                                )}</span>
+                                            </div>
+                                        </td>
                                         <td class="table-actions">
                                             <button class="btn-icon" data-edit-id="${item.id}" title="Edit">Edit</button>
                                             <button class="btn-icon danger" data-delete-id="${item.id}" title="Delete">Delete</button>
@@ -279,7 +414,7 @@ function dashboardPage() {
                                 `
                                           )
                                           .join('')
-                                    : '<tr><td colspan="6" class="muted">No transactions yet.</td></tr>'
+                                    : '<tr><td colspan="7" class="muted">No transactions yet.</td></tr>'
                             }
                         </tbody>
                     </table>
@@ -293,8 +428,11 @@ function exchangeRatesPage() {
     return `
         <section class="card">
             <h2>Exchange Rates</h2>
-            <p>Latest rates based on EUR.</p>
-            <div id="rates-content" class="rates-loading">Loading rates...</div>
+            <p class="muted">Live Exchange Rates (Base: EGP)</p>
+            <div id="currency-container" class="rates-grid">
+                <div class="col-span-all muted">Loading rates...</div>
+            </div>
+            <p id="last-updated" class="muted"></p>
         </section>
     `;
 }
@@ -306,28 +444,6 @@ function notFoundPage() {
             <p>The requested page does not exist.</p>
         </section>
     `;
-}
-
-async function loadRates() {
-    const target = document.querySelector('#rates-content');
-    if (!target) return;
-
-    try {
-        const response = await fetch('https://api.frankfurter.app/latest?from=EUR&to=USD,GBP,JPY,SAR');
-        if (!response.ok) throw new Error('Unable to load exchange rates.');
-
-        const data = await response.json();
-        const rows = Object.entries(data.rates)
-            .map(([currency, value]) => `<li><strong>${currency}</strong>: ${value}</li>`)
-            .join('');
-
-        target.innerHTML = `
-            <p class="muted">Date: ${data.date}</p>
-            <ul class="rates-list">${rows}</ul>
-        `;
-    } catch (error) {
-        target.innerHTML = `<p class="error">${error.message}</p>`;
-    }
 }
 
 function renderPage() {
@@ -367,7 +483,8 @@ function render() {
     `;
 
     if (window.location.pathname === '/exchange-rates') {
-        loadRates();
+        renderExchangeRatesIntoPage();
+        initExchangeRates();
     }
 
     if (window.location.pathname === '/dashboard') {
@@ -543,6 +660,14 @@ function bindDashboardEvents() {
             render();
         });
     });
+
+    document.querySelectorAll('[data-convert-id]').forEach((select) => {
+        select.addEventListener('change', () => {
+            const id = Number(select.getAttribute('data-convert-id'));
+            state.conversionCurrencyById[id] = select.value;
+            render();
+        });
+    });
 }
 
 document.addEventListener('click', (event) => {
@@ -555,6 +680,7 @@ document.addEventListener('click', (event) => {
 
 window.addEventListener('popstate', async () => {
     await loadTransactions();
+    await initExchangeRates();
     render();
 });
 
@@ -564,6 +690,7 @@ async function boot() {
     }
 
     await loadTransactions();
+    await initExchangeRates();
     render();
 }
 

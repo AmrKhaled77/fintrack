@@ -286,9 +286,74 @@ th {
     margin-top: 8px;
 }
 
-.rates-list {
-    margin: 12px 0 0;
-    padding-left: 18px;
+.rates-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.rate-card {
+    padding: 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #fff;
+    transition: border-color 0.2s;
+}
+
+.rate-card:hover {
+    border-color: #d4f88a;
+}
+
+.rate-card-head {
+    font-size: 13px;
+    font-weight: 600;
+    color: #6b7280;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.rate-symbol {
+    font-size: 16px;
+    color: #111827;
+}
+
+.rate-value {
+    font-size: 26px;
+    font-weight: 700;
+    color: #111827;
+}
+
+.rate-unit {
+    font-size: 13px;
+    font-weight: 400;
+    color: #6b7280;
+}
+
+.col-span-all {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 12px 0;
+}
+
+.convert-box {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.convert-select {
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    padding: 4px 6px;
+    font-size: 12px;
+    max-width: 82px;
+}
+
+.converted-value {
+    font-size: 12px;
+    color: #374151;
 }
 
 .muted {
@@ -330,6 +395,10 @@ th {
     }
 
     .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .rates-grid {
         grid-template-columns: 1fr;
     }
 }
