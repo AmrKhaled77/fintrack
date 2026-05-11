@@ -5,9 +5,45 @@ const navItems = [
     { label: 'Exchange Rates', path: '/exchange-rates' },
 ];
 
-function navigate(path) {
+const state = {
+    transactions: [],
+    editingId: null,
+};
+
+function formatEGP(value) {
+    return `${Number(value).toFixed(2)} EGP`;
+}
+
+async function requestJson(url, options = {}) {
+    const response = await fetch(url, {
+        headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+        },
+        ...options,
+    });
+
+    if (response.status === 204) {
+        return null;
+    }
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        const message = data?.message || 'Request failed.';
+        throw new Error(message);
+    }
+
+    return data;
+}
+
+async function navigate(path) {
     if (window.location.pathname !== path) {
         window.history.pushState({}, '', path);
+    }
+
+    if (path === '/dashboard') {
+        await loadTransactions();
     }
 
     render();
@@ -28,11 +64,91 @@ function renderNav() {
 }
 
 function dashboardPage() {
+    const income = state.transactions
+        .filter((item) => item.type === 'income')
+        .reduce((sum, item) => sum + Number(item.amount), 0);
+    const expense = state.transactions
+        .filter((item) => item.type === 'expense')
+        .reduce((sum, item) => sum + Number(item.amount), 0);
+    const balance = income - expense;
+
     return `
-        <section class="card">
-            <h2>Dashboard</h2>
-            <p>Welcome to your SPA dashboard in Laravel.</p>
-            <p class="muted">Use the navigation in the header to switch pages.</p>
+        <section class="stats-grid">
+            <article class="stat-card stat-card-balance">
+                <h3>Total Balance</h3>
+                <p>${formatEGP(balance)}</p>
+            </article>
+            <article class="stat-card">
+                <h3>Income</h3>
+                <p class="income">${formatEGP(income)}</p>
+            </article>
+            <article class="stat-card">
+                <h3>Expense</h3>
+                <p class="expense">${formatEGP(expense)}</p>
+            </article>
+        </section>
+
+        <section class="dashboard-grid">
+            <article class="card">
+                <h2>${state.editingId ? 'Edit Transaction' : 'Add Transaction'}</h2>
+                <form id="transaction-form" class="form-grid">
+                    <input name="title" placeholder="Title" required />
+                    <input name="amount" placeholder="Amount" type="number" min="0" step="0.01" required />
+                    <select name="type" required>
+                        <option value="">Select Type</option>
+                        <option value="income">Income</option>
+                        <option value="expense">Expense</option>
+                    </select>
+                    <input name="category" placeholder="Category" />
+                    <input name="date" type="date" required />
+                    <div class="form-actions">
+                        <button class="btn btn-primary" type="submit">${state.editingId ? 'Update' : 'Add'} Transaction</button>
+                        ${state.editingId ? '<button class="btn btn-secondary" type="button" id="cancel-edit">Cancel</button>' : ''}
+                    </div>
+                </form>
+                <p id="form-message" class="muted"></p>
+            </article>
+
+            <article class="card">
+                <h2>Transactions</h2>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th>Amount</th>
+                                <th>Type</th>
+                                <th>Category</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${
+                                state.transactions.length
+                                    ? state.transactions
+                                          .map(
+                                              (item) => `
+                                    <tr>
+                                        <td>${item.title}</td>
+                                        <td>${formatEGP(item.amount)}</td>
+                                        <td class="${item.type === 'income' ? 'income' : 'expense'}">${item.type}</td>
+                                        <td>${item.category || '-'}</td>
+                                        <td>${item.date}</td>
+                                        <td class="table-actions">
+                                            <button class="btn-icon" data-edit-id="${item.id}" title="Edit">Edit</button>
+                                            <button class="btn-icon danger" data-delete-id="${item.id}" title="Delete">Delete</button>
+                                        </td>
+                                    </tr>
+                                `
+                                          )
+                                          .join('')
+                                    : '<tr><td colspan="6" class="muted">No transactions yet.</td></tr>'
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </article>
         </section>
     `;
 }
@@ -111,6 +227,105 @@ function render() {
     if (window.location.pathname === '/exchange-rates') {
         loadRates();
     }
+
+    if (window.location.pathname === '/dashboard') {
+        bindDashboardEvents();
+    }
+}
+
+function fillFormFromTransaction(transaction) {
+    const form = document.querySelector('#transaction-form');
+    if (!form) return;
+
+    form.elements.title.value = transaction.title || '';
+    form.elements.amount.value = transaction.amount || '';
+    form.elements.type.value = transaction.type || '';
+    form.elements.category.value = transaction.category || '';
+    form.elements.date.value = transaction.date || '';
+}
+
+async function loadTransactions() {
+    try {
+        state.transactions = await requestJson('/api/transactions');
+    } catch (error) {
+        state.transactions = [];
+        console.error(error);
+    }
+}
+
+async function submitTransaction(form) {
+    const payload = {
+        title: form.elements.title.value.trim(),
+        amount: Number(form.elements.amount.value),
+        type: form.elements.type.value,
+        category: form.elements.category.value.trim() || null,
+        date: form.elements.date.value,
+    };
+
+    if (state.editingId) {
+        await requestJson(`/api/transactions/${state.editingId}`, {
+            method: 'PUT',
+            body: JSON.stringify(payload),
+        });
+    } else {
+        await requestJson('/api/transactions', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+    }
+}
+
+function bindDashboardEvents() {
+    const form = document.querySelector('#transaction-form');
+    if (!form) return;
+
+    if (state.editingId) {
+        const current = state.transactions.find((item) => item.id === state.editingId);
+        if (current) fillFormFromTransaction(current);
+    }
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const messageEl = document.querySelector('#form-message');
+
+        try {
+            await submitTransaction(form);
+            state.editingId = null;
+            await loadTransactions();
+            render();
+        } catch (error) {
+            if (messageEl) messageEl.textContent = error.message;
+        }
+    });
+
+    const cancelButton = document.querySelector('#cancel-edit');
+    if (cancelButton) {
+        cancelButton.addEventListener('click', () => {
+            state.editingId = null;
+            render();
+        });
+    }
+
+    document.querySelectorAll('[data-edit-id]').forEach((button) => {
+        button.addEventListener('click', () => {
+            state.editingId = Number(button.getAttribute('data-edit-id'));
+            render();
+        });
+    });
+
+    document.querySelectorAll('[data-delete-id]').forEach((button) => {
+        button.addEventListener('click', async () => {
+            const id = Number(button.getAttribute('data-delete-id'));
+            const ok = window.confirm('Delete this transaction?');
+            if (!ok) return;
+
+            await requestJson(`/api/transactions/${id}`, { method: 'DELETE' });
+
+            if (state.editingId === id) state.editingId = null;
+            await loadTransactions();
+            render();
+        });
+    });
 }
 
 document.addEventListener('click', (event) => {
@@ -121,10 +336,18 @@ document.addEventListener('click', (event) => {
     navigate(anchor.getAttribute('href'));
 });
 
-window.addEventListener('popstate', render);
+window.addEventListener('popstate', async () => {
+    await loadTransactions();
+    render();
+});
 
-if (window.location.pathname === '/') {
-    window.history.replaceState({}, '', '/dashboard');
+async function boot() {
+    if (window.location.pathname === '/') {
+        window.history.replaceState({}, '', '/dashboard');
+    }
+
+    await loadTransactions();
+    render();
 }
 
-render();
+boot();
