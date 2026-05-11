@@ -1,4 +1,6 @@
 const app = document.querySelector('#app');
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+const currentUserName = app?.dataset.userName || 'User';
 
 const navItems = [
     { label: 'Dashboard', path: '/dashboard' },
@@ -64,11 +66,19 @@ function renderChart(income, expense) {
 }
 
 async function requestJson(url, options = {}) {
+    const method = (options.method || 'GET').toUpperCase();
+    const headers = {
+        Accept: 'application/json',
+        ...options.headers,
+    };
+
+    if (method !== 'GET' && method !== 'HEAD') {
+        headers['Content-Type'] = 'application/json';
+        headers['X-CSRF-TOKEN'] = csrfToken;
+    }
+
     const response = await fetch(url, {
-        headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-        },
+        headers,
         ...options,
     });
 
@@ -267,9 +277,12 @@ function render() {
                 <div class="brand">Fin<span>Track</span></div>
                 <nav class="nav">${renderNav()}</nav>
                 <div class="user-menu">
-                    <span class="user-name">Hello, amrk49</span>
-                    <span class="avatar">AM</span>
-                    <a href="#" class="logout">Logout</a>
+                    <span class="user-name">Hello, ${currentUserName}</span>
+                    <span class="avatar">${currentUserName.slice(0, 2).toUpperCase()}</span>
+                    <form method="POST" action="/logout" class="logout-form">
+                        <input type="hidden" name="_token" value="${csrfToken}">
+                        <button type="submit" class="logout">Logout</button>
+                    </form>
                 </div>
             </header>
             <main class="layout">${renderPage()}</main>
@@ -308,7 +321,7 @@ function fillFormFromTransaction(transaction) {
 
 async function loadTransactions() {
     try {
-        state.transactions = await requestJson('/api/transactions');
+        state.transactions = await requestJson('/transactions');
     } catch (error) {
         state.transactions = [];
         console.error(error);
@@ -325,12 +338,12 @@ async function submitTransaction(form) {
     };
 
     if (state.editingId) {
-        await requestJson(`/api/transactions/${state.editingId}`, {
+        await requestJson(`/transactions/${state.editingId}`, {
             method: 'PUT',
             body: JSON.stringify(payload),
         });
     } else {
-        await requestJson('/api/transactions', {
+        await requestJson('/transactions', {
             method: 'POST',
             body: JSON.stringify(payload),
         });
@@ -381,7 +394,7 @@ function bindDashboardEvents() {
             const ok = window.confirm('Delete this transaction?');
             if (!ok) return;
 
-            await requestJson(`/api/transactions/${id}`, { method: 'DELETE' });
+            await requestJson(`/transactions/${id}`, { method: 'DELETE' });
 
             if (state.editingId === id) state.editingId = null;
             await loadTransactions();

@@ -25,7 +25,10 @@ class TransactionController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $userId = $request->user()->id;
+
         $transactions = Transaction::query()
+            ->where('user_id', $userId)
             ->when(
                 $request->filled('type'),
                 fn ($query) => $query->where('type', $request->string('type'))
@@ -52,6 +55,7 @@ class TransactionController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate($this->rules());
+        $validated['user_id'] = $request->user()->id;
 
         $transaction = Transaction::create($validated);
 
@@ -60,23 +64,28 @@ class TransactionController extends Controller
 
     public function update(Request $request, Transaction $transaction): JsonResponse
     {
+        abort_unless($transaction->user_id === $request->user()->id, 403);
+
         $validated = $request->validate($this->rules());
         $transaction->update($validated);
 
         return response()->json($transaction);
     }
 
-    public function destroy(Transaction $transaction): JsonResponse
+    public function destroy(Request $request, Transaction $transaction): JsonResponse
     {
+        abort_unless($transaction->user_id === $request->user()->id, 403);
+
         $transaction->delete();
 
         return response()->json(status: 204);
     }
 
-    public function summary(): JsonResponse
+    public function summary(Request $request): JsonResponse
     {
-        $income = Transaction::where('type', 'income')->sum('amount');
-        $expense = Transaction::where('type', 'expense')->sum('amount');
+        $userId = $request->user()->id;
+        $income = Transaction::where('user_id', $userId)->where('type', 'income')->sum('amount');
+        $expense = Transaction::where('user_id', $userId)->where('type', 'expense')->sum('amount');
 
         return response()->json([
             'total_income' => number_format((float) $income, 2, '.', ''),
@@ -90,6 +99,7 @@ class TransactionController extends Controller
         $type = $request->string('type')->value();
 
         $query = Transaction::query()
+            ->where('user_id', $request->user()->id)
             ->selectRaw('COALESCE(category, "Uncategorized") as category')
             ->selectRaw('SUM(amount) as total')
             ->groupBy('category')
