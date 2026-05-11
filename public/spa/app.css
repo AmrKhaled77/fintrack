@@ -1,0 +1,141 @@
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #f3f3f3;
+    color: #202835;
+}
+
+#app {
+    min-height: 100vh;
+}
+
+.page-shell {
+    min-height: 100vh;
+}
+
+.layout {
+    width: 100%;
+    max-width: 980px;
+    margin: 44px auto 0;
+    padding: 0 16px 32px;
+}
+
+.topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #ffffff;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 0 16px;
+    min-height: 66px;
+}
+
+.nav {
+    display: flex;
+    gap: 22px;
+    margin: 0;
+}
+
+.nav-link {
+    text-decoration: none;
+    color: #525968;
+    padding: 23px 2px 20px;
+    border-bottom: 2px solid transparent;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.nav-link.active {
+    color: #111827;
+    border-bottom-color: #111827;
+}
+
+.brand {
+    font-size: 34px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: #111827;
+}
+
+.brand span {
+    color: #9cc97a;
+}
+
+.user-menu {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: #4b5563;
+}
+
+.avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 9999px;
+    background: #d9f99d;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #365314;
+    font-weight: 700;
+}
+
+.logout {
+    color: #ef4444;
+    text-decoration: none;
+    font-size: 13px;
+}
+
+.card {
+    background: #ffffff;
+    border-radius: 14px;
+    border: 1px solid #e5e7eb;
+    padding: 24px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.card h2 {
+    margin-top: 0;
+}
+
+.rates-list {
+    margin: 12px 0 0;
+    padding-left: 18px;
+}
+
+.muted {
+    color: #475569;
+}
+
+.rates-loading {
+    color: #334155;
+}
+
+.error {
+    color: #dc2626;
+}
+
+@media (max-width: 900px) {
+    .topbar {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px 18px;
+        padding: 10px 16px;
+    }
+
+    .brand {
+        width: 100%;
+        text-align: center;
+        font-size: 28px;
+    }
+
+    .nav-link {
+        padding: 8px 2px;
+    }
+
+    .layout {
+        margin-top: 24px;
+    }
+}
