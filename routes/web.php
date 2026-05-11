@@ -13,6 +13,9 @@ Route::middleware('guest')->group(function (): void {
 
 Route::middleware('auth')->group(function (): void {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+    Route::post('/profile/photo', [AuthController::class, 'uploadProfilePhoto'])->name('profile.photo');
+    Route::get('/profile/photo', [AuthController::class, 'showProfilePhoto'])->name('profile.photo.show');
+    Route::post('/profile', [AuthController::class, 'updateProfile'])->name('profile.update');
 
     Route::prefix('transactions')->group(function (): void {
         Route::get('/', [TransactionController::class, 'index']);

@@ -8,7 +8,12 @@
     <link rel="stylesheet" href="{{ asset('spa/app.css') }}">
 </head>
 <body>
-    <div id="app" data-user-name="{{ auth()->user()->name ?? 'User' }}"></div>
+    <div
+        id="app"
+        data-user-name="{{ auth()->user()->name ?? 'User' }}"
+        data-user-email="{{ auth()->user()->email ?? '' }}"
+        data-user-photo-url="{{ auth()->user()?->profile_photo_path ? route('profile.photo.show', ['v' => now()->timestamp]) : '' }}"
+    ></div>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="{{ asset('spa/app.js') }}" defer></script>
 </body>

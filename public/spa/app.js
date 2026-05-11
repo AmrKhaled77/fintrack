@@ -1,6 +1,8 @@
 const app = document.querySelector('#app');
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
-const currentUserName = app?.dataset.userName || 'User';
+let currentUserName = app?.dataset.userName || 'User';
+let currentUserEmail = app?.dataset.userEmail || '';
+let currentUserPhotoUrl = app?.dataset.userPhotoUrl || '';
 
 const navItems = [
     { label: 'Dashboard', path: '/dashboard' },
@@ -10,6 +12,7 @@ const navItems = [
 const state = {
     transactions: [],
     editingId: null,
+    isProfileModalOpen: false,
 };
 let chart = null;
 
@@ -63,6 +66,77 @@ function renderChart(income, expense) {
             },
         },
     });
+}
+
+function renderAvatar() {
+    if (currentUserPhotoUrl) {
+        return `<img src="${currentUserPhotoUrl}" alt="Profile" class="avatar-image">`;
+    }
+
+    return `<span class="avatar-text">${currentUserName.slice(0, 2).toUpperCase()}</span>`;
+}
+
+function renderProfileModal() {
+    if (!state.isProfileModalOpen) {
+        return '';
+    }
+
+    return `
+        <div class="modal-backdrop" id="profile-modal-backdrop">
+            <div class="modal-card">
+                <h3>Edit Profile</h3>
+                <form id="profile-form" class="form-grid">
+                    <input name="name" value="${currentUserName}" placeholder="Name" required />
+                    <input name="email" type="email" value="${currentUserEmail}" placeholder="Email" required />
+                    <label class="file-label">Profile Picture</label>
+                    <input name="profile_photo" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" />
+                    <p class="muted small">Allowed: JPG, PNG, WEBP. Max size: 2MB.</p>
+                    <p id="profile-message" class="error"></p>
+                    <div class="form-actions modal-actions">
+                        <button class="btn btn-secondary" type="button" id="profile-cancel">Cancel</button>
+                        <button class="btn btn-primary" type="submit">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+}
+
+async function updateProfile(form) {
+    const name = form.elements.name.value.trim();
+    const email = form.elements.email.value.trim();
+    const file = form.elements.profile_photo.files?.[0];
+
+    if (!name || !email) {
+        throw new Error('Name and email are required.');
+    }
+
+    if (file) {
+        validateProfileFile(file);
+    }
+
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('email', email);
+    if (file) formData.append('profile_photo', file);
+
+    const response = await fetch('/profile', {
+        method: 'POST',
+        headers: {
+            Accept: 'application/json',
+            'X-CSRF-TOKEN': csrfToken,
+        },
+        body: formData,
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+        throw new Error(data?.message || 'Failed to update profile.');
+    }
+
+    currentUserName = data.name;
+    currentUserEmail = data.email;
+    currentUserPhotoUrl = data.photo_url || '';
 }
 
 async function requestJson(url, options = {}) {
@@ -278,7 +352,9 @@ function render() {
                 <nav class="nav">${renderNav()}</nav>
                 <div class="user-menu">
                     <span class="user-name">Hello, ${currentUserName}</span>
-                    <span class="avatar">${currentUserName.slice(0, 2).toUpperCase()}</span>
+                    <button type="button" class="avatar" id="avatar-upload-trigger" title="Edit profile">
+                        ${renderAvatar()}
+                    </button>
                     <form method="POST" action="/logout" class="logout-form">
                         <input type="hidden" name="_token" value="${csrfToken}">
                         <button type="submit" class="logout">Logout</button>
@@ -286,6 +362,7 @@ function render() {
                 </div>
             </header>
             <main class="layout">${renderPage()}</main>
+            ${renderProfileModal()}
         </div>
     `;
 
@@ -305,6 +382,71 @@ function render() {
     } else if (chart) {
         chart.destroy();
         chart = null;
+    }
+
+    bindNavbarEvents();
+}
+
+function validateProfileFile(file) {
+    if (!file) {
+        throw new Error('Please choose a file.');
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    const maxSize = 2 * 1024 * 1024;
+
+    if (!allowedTypes.includes(file.type)) {
+        throw new Error('Invalid file type. Use JPG, PNG, or WEBP.');
+    }
+
+    if (file.size > maxSize) {
+        throw new Error('File too large. Max size is 2MB.');
+    }
+}
+
+function bindNavbarEvents() {
+    const trigger = document.querySelector('#avatar-upload-trigger');
+    if (!trigger) return;
+
+    trigger.addEventListener('click', () => {
+        state.isProfileModalOpen = true;
+        render();
+    });
+
+    const modalBackdrop = document.querySelector('#profile-modal-backdrop');
+    const cancelButton = document.querySelector('#profile-cancel');
+    const profileForm = document.querySelector('#profile-form');
+    const messageEl = document.querySelector('#profile-message');
+
+    if (modalBackdrop) {
+        modalBackdrop.addEventListener('click', (event) => {
+            if (event.target.id === 'profile-modal-backdrop') {
+                state.isProfileModalOpen = false;
+                render();
+            }
+        });
+    }
+
+    if (cancelButton) {
+        cancelButton.addEventListener('click', () => {
+            state.isProfileModalOpen = false;
+            render();
+        });
+    }
+
+    if (profileForm) {
+        profileForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if (messageEl) messageEl.textContent = '';
+
+            try {
+                await updateProfile(profileForm);
+                state.isProfileModalOpen = false;
+                render();
+            } catch (error) {
+                if (messageEl) messageEl.textContent = error.message;
+            }
+        });
     }
 }
 
