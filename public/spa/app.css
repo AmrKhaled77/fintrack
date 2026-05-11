@@ -136,6 +136,12 @@ body {
     gap: 18px;
 }
 
+.dashboard-left {
+    display: grid;
+    gap: 18px;
+    align-content: start;
+}
+
 .form-grid {
     display: grid;
     gap: 10px;
@@ -150,6 +156,7 @@ body {
     font-size: 14px;
     box-sizing: border-box;
 }
+
 
 .form-actions {
     display: flex;
@@ -215,6 +222,15 @@ th {
 .btn-icon.danger {
     color: #dc2626;
     border-color: #fecaca;
+}
+
+.chart-card {
+    padding-bottom: 16px;
+}
+
+.chart-wrap {
+    height: 260px;
+    margin-top: 8px;
 }
 
 .rates-list {

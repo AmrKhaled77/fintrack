@@ -9,9 +9,58 @@ const state = {
     transactions: [],
     editingId: null,
 };
+let chart = null;
 
 function formatEGP(value) {
     return `${Number(value).toFixed(2)} EGP`;
+}
+
+function renderIncomeExpenseChart() {
+    return `
+        <article class="card chart-card">
+            <h2>Income vs Expense</h2>
+            <div class="chart-wrap">
+                <canvas id="financeChart"></canvas>
+            </div>
+        </article>
+    `;
+}
+
+function renderChart(income, expense) {
+    const canvas = document.getElementById('financeChart');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    if (chart) {
+        chart.destroy();
+    }
+
+    const incomeValue = Number(income) || 0;
+    const expenseValue = Number(expense) || 0;
+    const isEmpty = incomeValue === 0 && expenseValue === 0;
+
+    chart = new Chart(canvas, {
+        type: 'doughnut',
+        data: isEmpty
+            ? {
+                  labels: ['No Data'],
+                  datasets: [{ data: [1], backgroundColor: ['#ddd'] }],
+              }
+            : {
+                  labels: ['Income', 'Expense'],
+                  datasets: [{ data: [incomeValue, expenseValue], backgroundColor: ['#2ecc71', '#e74c3c'] }],
+              },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: isEmpty
+                    ? { display: false }
+                    : {
+                          position: 'bottom',
+                      },
+            },
+        },
+    });
 }
 
 async function requestJson(url, options = {}) {
@@ -89,25 +138,28 @@ function dashboardPage() {
         </section>
 
         <section class="dashboard-grid">
-            <article class="card">
-                <h2>${state.editingId ? 'Edit Transaction' : 'Add Transaction'}</h2>
-                <form id="transaction-form" class="form-grid">
-                    <input name="title" placeholder="Title" required />
-                    <input name="amount" placeholder="Amount" type="number" min="0" step="0.01" required />
-                    <select name="type" required>
-                        <option value="">Select Type</option>
-                        <option value="income">Income</option>
-                        <option value="expense">Expense</option>
-                    </select>
-                    <input name="category" placeholder="Category" />
-                    <input name="date" type="date" required />
-                    <div class="form-actions">
-                        <button class="btn btn-primary" type="submit">${state.editingId ? 'Update' : 'Add'} Transaction</button>
-                        ${state.editingId ? '<button class="btn btn-secondary" type="button" id="cancel-edit">Cancel</button>' : ''}
-                    </div>
-                </form>
-                <p id="form-message" class="muted"></p>
-            </article>
+            <div class="dashboard-left">
+                <article class="card">
+                    <h2>${state.editingId ? 'Edit Transaction' : 'Add Transaction'}</h2>
+                    <form id="transaction-form" class="form-grid">
+                        <input name="title" placeholder="Title" required />
+                        <input name="amount" placeholder="Amount" type="number" min="0" step="0.01" required />
+                        <select name="type" required>
+                            <option value="">Select Type</option>
+                            <option value="income">Income</option>
+                            <option value="expense">Expense</option>
+                        </select>
+                        <input name="category" placeholder="Category" />
+                        <input name="date" type="date" required />
+                        <div class="form-actions">
+                            <button class="btn btn-primary" type="submit">${state.editingId ? 'Update' : 'Add'} Transaction</button>
+                            ${state.editingId ? '<button class="btn btn-secondary" type="button" id="cancel-edit">Cancel</button>' : ''}
+                        </div>
+                    </form>
+                    <p id="form-message" class="muted"></p>
+                </article>
+                ${renderIncomeExpenseChart(income, expense)}
+            </div>
 
             <article class="card">
                 <h2>Transactions</h2>
@@ -230,6 +282,16 @@ function render() {
 
     if (window.location.pathname === '/dashboard') {
         bindDashboardEvents();
+        const income = state.transactions
+            .filter((item) => item.type === 'income')
+            .reduce((sum, item) => sum + Number(item.amount), 0);
+        const expense = state.transactions
+            .filter((item) => item.type === 'expense')
+            .reduce((sum, item) => sum + Number(item.amount), 0);
+        renderChart(income, expense);
+    } else if (chart) {
+        chart.destroy();
+        chart = null;
     }
 }
 
