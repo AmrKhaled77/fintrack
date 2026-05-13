@@ -4,11 +4,6 @@ let currentUserName = app?.dataset.userName || 'User';
 let currentUserEmail = app?.dataset.userEmail || '';
 let currentUserPhotoUrl = app?.dataset.userPhotoUrl || '';
 
-const navItems = [
-    { label: 'Dashboard', path: '/dashboard' },
-    { label: 'Exchange Rates', path: '/exchange-rates' },
-];
-
 const state = {
     transactions: [],
     editingId: null,
@@ -19,9 +14,6 @@ const state = {
     conversionCurrencyById: {},
 };
 let chart = null;
-const exchangeApiUrl =
-    'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/egp.json';
-const exchangeFallbackApi = 'https://latest.currency-api.pages.dev/v1/currencies/egp.json';
 const supportedCurrencies = [
     { code: 'USD', symbol: '$', key: 'usd' },
     { code: 'EUR', symbol: '€', key: 'eur' },
@@ -138,6 +130,10 @@ function renderProfileModal() {
     `;
 }
 
+function isValidEmail(value) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
 async function updateProfile(form) {
     const name = form.elements.name.value.trim();
     const email = form.elements.email.value.trim();
@@ -145,6 +141,10 @@ async function updateProfile(form) {
 
     if (!name || !email) {
         throw new Error('Name and email are required.');
+    }
+
+    if (!isValidEmail(email)) {
+        throw new Error('Please enter a valid email address.');
     }
 
     if (file) {
@@ -167,6 +167,11 @@ async function updateProfile(form) {
 
     const data = await response.json();
     if (!response.ok) {
+        if (data?.errors && typeof data.errors === 'object') {
+            const messages = Object.values(data.errors).flat();
+            const first = messages.find((m) => typeof m === 'string' && m.length);
+            throw new Error(first || data.message || 'Please check the form and try again.');
+        }
         throw new Error(data?.message || 'Failed to update profile.');
     }
 
@@ -199,6 +204,11 @@ async function requestJson(url, options = {}) {
     const data = await response.json();
 
     if (!response.ok) {
+        if (data?.errors && typeof data.errors === 'object') {
+            const messages = Object.values(data.errors).flat();
+            const first = messages.find((m) => typeof m === 'string' && m.length);
+            throw new Error(first || data.message || 'Please check the form and try again.');
+        }
         const message = data?.message || 'Request failed.';
         throw new Error(message);
     }
@@ -206,10 +216,24 @@ async function requestJson(url, options = {}) {
     return data;
 }
 
-function fetchExchangeData(url) {
-    return fetch(url).then((res) => {
-        if (!res.ok) throw new Error('Network response was not ok');
-        return res.json();
+function fetchExchangeDataFromServer() {
+    return fetch('/exchange-rates/data', {
+        headers: {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+        },
+        credentials: 'same-origin',
+    }).then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            const message =
+                typeof data?.message === 'string' && data.message.length > 0
+                    ? data.message
+                    : 'Unable to load exchange rates at this time.';
+            throw new Error(message);
+        }
+
+        return data;
     });
 }
 
@@ -254,8 +278,7 @@ function initExchangeRates() {
         return state.exchangePromise;
     }
 
-    state.exchangePromise = fetchExchangeData(exchangeApiUrl)
-        .catch(() => fetchExchangeData(exchangeFallbackApi))
+    state.exchangePromise = fetchExchangeDataFromServer()
         .then((data) => {
             state.exchangeRates = data.egp || null;
             state.exchangeDate = data.date ? formatRateDate(data.date) : '';
@@ -267,11 +290,11 @@ function initExchangeRates() {
             const container = document.getElementById('currency-container');
             const updated = document.getElementById('last-updated');
             if (container) {
-                container.innerHTML = `
-                    <div class="col-span-all error">
-                        Unable to load exchange rates at this time.
-                    </div>
-                `;
+                container.replaceChildren();
+                const row = document.createElement('div');
+                row.className = 'col-span-all error';
+                row.textContent = error.message || 'Unable to load exchange rates at this time.';
+                container.appendChild(row);
             }
             if (updated) updated.innerText = '';
             state.exchangePromise = null;
@@ -295,20 +318,6 @@ async function navigate(path) {
     }
 
     render();
-}
-
-function renderNav() {
-    return navItems
-        .map((item) => {
-            const active = window.location.pathname === item.path;
-
-            return `
-                <a href="${item.path}" data-link class="nav-link${active ? ' active' : ''}">
-                    ${item.label}
-                </a>
-            `;
-        })
-        .join('');
 }
 
 function dashboardPage() {
@@ -458,29 +467,37 @@ function renderPage() {
     }
 }
 
+function updateNavActive() {
+    const path = window.location.pathname === '/' ? '/dashboard' : window.location.pathname;
+    document.querySelectorAll('a.nav-link[data-link]').forEach((anchor) => {
+        const href = anchor.getAttribute('href') || '';
+        const active = href === path;
+        anchor.classList.toggle('active', active);
+    });
+}
+
+function updateHeaderUserLabels() {
+    const nameEl = document.querySelector('.user-menu .user-name');
+    if (nameEl) {
+        nameEl.textContent = `Hello, ${currentUserName}`;
+    }
+
+    const trigger = document.querySelector('#avatar-upload-trigger');
+    if (trigger) {
+        trigger.innerHTML = renderAvatar();
+    }
+}
+
 function render() {
     if (!app) return;
 
     app.innerHTML = `
-        <div class="page-shell">
-            <header class="topbar">
-                <div class="brand">Fin<span>Track</span></div>
-                <nav class="nav">${renderNav()}</nav>
-                <div class="user-menu">
-                    <span class="user-name">Hello, ${currentUserName}</span>
-                    <button type="button" class="avatar" id="avatar-upload-trigger" title="Edit profile">
-                        ${renderAvatar()}
-                    </button>
-                    <form method="POST" action="/logout" class="logout-form">
-                        <input type="hidden" name="_token" value="${csrfToken}">
-                        <button type="submit" class="logout">Logout</button>
-                    </form>
-                </div>
-            </header>
-            <main class="layout">${renderPage()}</main>
-            ${renderProfileModal()}
-        </div>
+        ${renderPage()}
+        ${renderProfileModal()}
     `;
+
+    updateHeaderUserLabels();
+    updateNavActive();
 
     if (window.location.pathname === '/exchange-rates') {
         renderExchangeRatesIntoPage();
@@ -501,7 +518,7 @@ function render() {
         chart = null;
     }
 
-    bindNavbarEvents();
+    bindProfileModalEvents();
 }
 
 function validateProfileFile(file) {
@@ -521,15 +538,16 @@ function validateProfileFile(file) {
     }
 }
 
-function bindNavbarEvents() {
-    const trigger = document.querySelector('#avatar-upload-trigger');
-    if (!trigger) return;
-
-    trigger.addEventListener('click', () => {
-        state.isProfileModalOpen = true;
-        render();
+function initShellListeners() {
+    document.addEventListener('click', (event) => {
+        if (event.target.closest('#avatar-upload-trigger')) {
+            state.isProfileModalOpen = true;
+            render();
+        }
     });
+}
 
+function bindProfileModalEvents() {
     const modalBackdrop = document.querySelector('#profile-modal-backdrop');
     const cancelButton = document.querySelector('#profile-cancel');
     const profileForm = document.querySelector('#profile-form');
@@ -587,7 +605,41 @@ async function loadTransactions() {
     }
 }
 
+function validateTransactionForm(form) {
+    const title = form.elements.title.value.trim();
+    const amountRaw = form.elements.amount.value;
+    const type = form.elements.type.value;
+    const date = form.elements.date.value;
+
+    if (!title) {
+        return 'Please enter a title for this transaction.';
+    }
+
+    if (amountRaw === '' || Number.isNaN(Number(amountRaw))) {
+        return 'Please enter a valid amount.';
+    }
+
+    if (Number(amountRaw) < 0) {
+        return 'The amount cannot be negative.';
+    }
+
+    if (!type || (type !== 'income' && type !== 'expense')) {
+        return 'Please select either income or expense.';
+    }
+
+    if (!date) {
+        return 'Please choose a date for this transaction.';
+    }
+
+    return null;
+}
+
 async function submitTransaction(form) {
+    const clientError = validateTransactionForm(form);
+    if (clientError) {
+        throw new Error(clientError);
+    }
+
     const payload = {
         title: form.elements.title.value.trim(),
         amount: Number(form.elements.amount.value),
@@ -628,7 +680,10 @@ function bindDashboardEvents() {
             await loadTransactions();
             render();
         } catch (error) {
-            if (messageEl) messageEl.textContent = error.message;
+            if (messageEl) {
+                messageEl.textContent = error.message;
+                messageEl.className = 'error';
+            }
         }
     });
 
@@ -683,6 +738,8 @@ window.addEventListener('popstate', async () => {
     await initExchangeRates();
     render();
 });
+
+initShellListeners();
 
 async function boot() {
     if (window.location.pathname === '/') {

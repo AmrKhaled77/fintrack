@@ -368,6 +368,133 @@ th {
     color: #dc2626;
 }
 
+.site-footer {
+    text-align: center;
+    padding: 20px 16px 28px;
+    font-size: 13px;
+    color: #64748b;
+    border-top: 1px solid #e5e7eb;
+    background: #ffffff;
+    margin-top: auto;
+}
+
+.site-footer p {
+    margin: 0;
+}
+
+.exchange-api-banner {
+    background: #fff7ed;
+    border-bottom: 1px solid #fed7aa;
+    color: #9a3412;
+    padding: 10px 16px;
+    text-align: center;
+    font-size: 14px;
+}
+
+.exchange-api-banner p {
+    margin: 0;
+}
+
+.guest-body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: #f3f3f3;
+}
+
+.guest-main {
+    flex: 1;
+    display: grid;
+    place-items: center;
+    padding: 24px 16px;
+}
+
+.guest-topbar {
+    justify-content: center;
+}
+
+.brand-link {
+    text-decoration: none;
+    color: inherit;
+}
+
+.auth-card {
+    width: 100%;
+    max-width: 380px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.auth-form h1 {
+    margin-top: 0;
+}
+
+.auth-form .field {
+    margin-bottom: 12px;
+}
+
+.auth-form input {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+}
+
+.btn-auth {
+    width: 100%;
+    border: 0;
+    border-radius: 8px;
+    padding: 10px 12px;
+    background: #111827;
+    color: #fff;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: 4px;
+}
+
+.auth-form .links {
+    margin-top: 10px;
+    text-align: center;
+    font-size: 14px;
+}
+
+.auth-form .links a {
+    color: #111827;
+    font-weight: 600;
+}
+
+.alert-error {
+    color: #b91c1c;
+    font-size: 14px;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    background: #fef2f2;
+    border-radius: 8px;
+    border: 1px solid #fecaca;
+}
+
+.error-list {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.field-error {
+    display: block;
+    color: #dc2626;
+    font-size: 13px;
+    margin-top: 6px;
+}
+
+.client-error {
+    margin-bottom: 10px;
+}
+
 @media (max-width: 900px) {
     .topbar {
         flex-wrap: wrap;

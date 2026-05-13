@@ -1,8 +1,11 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ExchangeRateController;
 use App\Http\Controllers\TransactionController;
 use Illuminate\Support\Facades\Route;
+
+Route::redirect('/', '/dashboard');
 
 Route::middleware('guest')->group(function (): void {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
@@ -26,8 +29,8 @@ Route::middleware('auth')->group(function (): void {
         Route::get('/category-totals', [TransactionController::class, 'categoryTotals']);
     });
 
+    Route::get('/exchange-rates/data', [ExchangeRateController::class, 'data'])->name('exchange-rates.data');
+
     Route::view('/{path?}', 'app')
         ->where('path', '.*');
 });
-
-Route::redirect('/', '/dashboard');

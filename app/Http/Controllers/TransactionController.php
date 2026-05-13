@@ -2,27 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreTransactionRequest;
+use App\Http\Requests\UpdateTransactionRequest;
 use App\Models\Transaction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class TransactionController extends Controller
 {
-    /**
-     * @return array<string, array<int, mixed>>
-     */
-    private function rules(): array
-    {
-        return [
-            'title' => ['required', 'string', 'max:100'],
-            'amount' => ['required', 'numeric', 'min:0'],
-            'type' => ['required', Rule::in(['income', 'expense'])],
-            'category' => ['nullable', 'string', 'max:50'],
-            'date' => ['required', 'date'],
-        ];
-    }
-
     public function index(Request $request): JsonResponse
     {
         $userId = $request->user()->id;
@@ -52,9 +39,9 @@ class TransactionController extends Controller
         return response()->json($transactions);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreTransactionRequest $request): JsonResponse
     {
-        $validated = $request->validate($this->rules());
+        $validated = $request->validated();
         $validated['user_id'] = $request->user()->id;
 
         $transaction = Transaction::create($validated);
@@ -62,11 +49,9 @@ class TransactionController extends Controller
         return response()->json($transaction, 201);
     }
 
-    public function update(Request $request, Transaction $transaction): JsonResponse
+    public function update(UpdateTransactionRequest $request, Transaction $transaction): JsonResponse
     {
-        abort_unless($transaction->user_id === $request->user()->id, 403);
-
-        $validated = $request->validate($this->rules());
+        $validated = $request->validated();
         $transaction->update($validated);
 
         return response()->json($transaction);
